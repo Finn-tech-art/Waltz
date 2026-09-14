@@ -6,6 +6,7 @@ import { getBranchStaff } from "@/lib/branch-access";
 import { buttonVariants } from "@/components/ui/button";
 import { EditFileForm } from "./edit-file-form";
 import { BringUpForm } from "./bring-up-form";
+import { DocumentUploadForm } from "./document-upload-form";
 import { markBringUpDone } from "../actions";
 
 type BringUpRow = {
@@ -16,6 +17,13 @@ type BringUpRow = {
   due_date: string;
   status: string;
   bring_up_staff: { profiles: { name: string } | null }[];
+};
+
+type DocumentRow = {
+  id: string;
+  file_name: string;
+  file_url: string;
+  uploaded_at: string;
 };
 
 export default async function FileDetailPage({
@@ -37,7 +45,7 @@ export default async function FileDetailPage({
 
   if (!file) notFound();
 
-  const [{ data: bringUps }, staffOptions] = await Promise.all([
+  const [{ data: bringUps }, staffOptions, { data: documents }] = await Promise.all([
     supabase
       .from("bring_ups")
       .select("id, event_type, title, description, due_date, status, bring_up_staff(profiles(name))")
@@ -45,7 +53,22 @@ export default async function FileDetailPage({
       .order("due_date")
       .returns<BringUpRow[]>(),
     getBranchStaff(supabase, file.branch_id),
+    supabase
+      .from("documents")
+      .select("id, file_name, file_url, uploaded_at")
+      .eq("file_id", id)
+      .order("uploaded_at", { ascending: false })
+      .returns<DocumentRow[]>(),
   ]);
+
+  const documentsWithUrls = await Promise.all(
+    (documents ?? []).map(async (doc) => {
+      const { data: signed } = await supabase.storage
+        .from("documents")
+        .createSignedUrl(doc.file_url, 60 * 5);
+      return { ...doc, signedUrl: signed?.signedUrl ?? null };
+    })
+  );
 
   const client = file.clients as unknown as { name: string } | null;
   const branch = file.branches as unknown as { name: string } | null;
@@ -124,6 +147,41 @@ export default async function FileDetailPage({
         </div>
 
         <BringUpForm fileId={id} staffOptions={staffOptions} />
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-lg font-medium">Documents</h2>
+
+        <div className="space-y-2">
+          {documentsWithUrls.map((doc) => (
+            <div
+              key={doc.id}
+              className="flex items-center justify-between gap-4 rounded-lg border p-4"
+            >
+              <div>
+                <p className="font-medium">{doc.file_name}</p>
+                <p className="text-sm text-muted-foreground">
+                  Uploaded {new Date(doc.uploaded_at).toLocaleString()}
+                </p>
+              </div>
+              {doc.signedUrl ? (
+                <a
+                  href={doc.signedUrl}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Download
+                </a>
+              ) : (
+                <span className="text-xs text-muted-foreground">Unavailable</span>
+              )}
+            </div>
+          ))}
+          {documentsWithUrls.length === 0 && (
+            <p className="text-sm text-muted-foreground">No documents yet.</p>
+          )}
+        </div>
+
+        <DocumentUploadForm fileId={id} branchId={file.branch_id} />
       </section>
     </div>
   );

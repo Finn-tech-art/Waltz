@@ -141,3 +141,41 @@ export async function markBringUpDone(fileId: string, bringUpId: string) {
   revalidatePath(`/files/${fileId}`);
   revalidatePath("/bring-ups");
 }
+
+export type DocumentFormState = { error?: string };
+
+export async function uploadDocument(
+  fileId: string,
+  branchId: string,
+  _prevState: DocumentFormState,
+  formData: FormData
+): Promise<DocumentFormState> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Please choose a file to upload." };
+  }
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${branchId}/${fileId}/${Date.now()}-${safeName}`;
+
+  const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
+  if (uploadError) return { error: uploadError.message };
+
+  const { error: insertError } = await supabase.from("documents").insert({
+    file_id: fileId,
+    uploaded_by: user.id,
+    file_name: file.name,
+    file_url: path,
+  });
+
+  if (insertError) {
+    await supabase.storage.from("documents").remove([path]);
+    return { error: insertError.message };
+  }
+
+  revalidatePath(`/files/${fileId}`);
+  return {};
+}
