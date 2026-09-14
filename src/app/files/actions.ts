@@ -132,14 +132,15 @@ export async function createBringUp(
   return {};
 }
 
-export async function markBringUpDone(fileId: string, bringUpId: string) {
+export async function markBringUpDone(fileId: string | null, bringUpId: string) {
   await requireUser();
   const supabase = await createClient();
 
   await supabase.from("bring_ups").update({ status: "done" }).eq("id", bringUpId);
 
-  revalidatePath(`/files/${fileId}`);
+  if (fileId) revalidatePath(`/files/${fileId}`);
   revalidatePath("/bring-ups");
+  revalidatePath("/calendar");
 }
 
 export type DocumentFormState = { error?: string };

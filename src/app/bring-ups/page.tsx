@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getSelectableBranches } from "@/lib/branch-access";
 import { buttonVariants } from "@/components/ui/button";
 import { markBringUpDone } from "@/app/files/actions";
 
@@ -9,13 +10,10 @@ type BringUpRow = {
   event_type: string;
   title: string;
   due_date: string;
-  file_id: string;
-  files: {
-    file_number: string;
-    branch_id: string;
-    clients: { name: string } | null;
-    branches: { name: string } | null;
-  } | null;
+  file_id: string | null;
+  branch_id: string;
+  branches: { name: string } | null;
+  files: { file_number: string; clients: { name: string } | null } | null;
 };
 
 export default async function BringUpsPage({
@@ -30,23 +28,47 @@ export default async function BringUpsPage({
   let query = supabase
     .from("bring_ups")
     .select(
-      "id, event_type, title, due_date, file_id, files(file_number, branch_id, clients(name), branches(name))"
+      "id, event_type, title, due_date, file_id, branch_id, branches(name), files(file_number, clients(name))"
     )
     .eq("status", "upcoming");
 
   if (user.role === "admin" && branch) {
-    const { data: branchFiles } = await supabase.from("files").select("id").eq("branch_id", branch);
-    const fileIds = (branchFiles ?? []).map((f) => f.id);
-    query = query.in("file_id", fileIds.length > 0 ? fileIds : ["00000000-0000-0000-0000-000000000000"]);
+    query = query.eq("branch_id", branch);
   }
 
   const { data: bringUps } = await query.order("due_date").returns<BringUpRow[]>();
+  const branchOptions = user.role === "admin" ? await getSelectableBranches(supabase, user) : [];
 
   const weekFromNow = Date.now() + 7 * 24 * 60 * 60 * 1000;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
-      <h1 className="text-2xl font-semibold">Upcoming bring-ups</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Upcoming bring-ups</h1>
+        <Link href="/calendar" className={buttonVariants({ variant: "outline" })}>
+          Calendar view
+        </Link>
+      </div>
+
+      {user.role === "admin" && (
+        <form className="flex flex-wrap gap-3" method="get">
+          <select
+            name="branch"
+            defaultValue={branch ?? ""}
+            className="rounded-md border px-3 py-2 text-sm"
+          >
+            <option value="">All branches</option>
+            {branchOptions.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+          <button type="submit" className={buttonVariants({ variant: "outline" })}>
+            Filter
+          </button>
+        </form>
+      )}
 
       <div className="space-y-2">
         {(bringUps ?? []).map((bringUp) => {
@@ -69,12 +91,20 @@ export default async function BringUpsPage({
                   )}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Due {new Date(bringUp.due_date).toLocaleString()} &middot;{" "}
-                  <Link href={`/files/${bringUp.file_id}`} className="underline">
-                    {bringUp.files?.file_number}
-                  </Link>{" "}
-                  ({bringUp.files?.clients?.name ?? "—"})
-                  {user.role === "admin" && <> &middot; {bringUp.files?.branches?.name}</>}
+                  Due {new Date(bringUp.due_date).toLocaleString()}
+                  {bringUp.file_id && bringUp.files ? (
+                    <>
+                      {" "}
+                      &middot;{" "}
+                      <Link href={`/files/${bringUp.file_id}`} className="underline">
+                        {bringUp.files.file_number}
+                      </Link>{" "}
+                      ({bringUp.files.clients?.name ?? "—"})
+                    </>
+                  ) : (
+                    <> &middot; Standalone event</>
+                  )}
+                  {user.role === "admin" && <> &middot; {bringUp.branches?.name}</>}
                 </p>
               </div>
               <form action={markBringUpDone.bind(null, bringUp.file_id, bringUp.id)}>

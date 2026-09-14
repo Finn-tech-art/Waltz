@@ -40,6 +40,9 @@ export default async function DashboardPage() {
         <Link href="/bring-ups" className={buttonVariants({ variant: "outline" })}>
           Bring-ups
         </Link>
+        <Link href="/calendar" className={buttonVariants({ variant: "outline" })}>
+          Calendar
+        </Link>
       </div>
 
       {user.role === "admin" ? (

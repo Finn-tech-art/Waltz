@@ -23,7 +23,7 @@ export async function getBranchStats(
   const now = new Date();
   const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  const [{ count: activeClients }, { count: openFiles }, { data: branchFiles }] =
+  const [{ count: activeClients }, { count: openFiles }, { count: bringUpsDueThisWeek }] =
     await Promise.all([
       supabase
         .from("clients")
@@ -34,26 +34,18 @@ export async function getBranchStats(
         .select("*", { count: "exact", head: true })
         .in("branch_id", branchIds)
         .eq("status", "open"),
-      supabase.from("files").select("id").in("branch_id", branchIds),
+      supabase
+        .from("bring_ups")
+        .select("*", { count: "exact", head: true })
+        .in("branch_id", branchIds)
+        .eq("status", "upcoming")
+        .gte("due_date", now.toISOString())
+        .lte("due_date", weekFromNow.toISOString()),
     ]);
-
-  const fileIds = (branchFiles ?? []).map((f) => f.id as string);
-
-  let bringUpsDueThisWeek = 0;
-  if (fileIds.length > 0) {
-    const { count } = await supabase
-      .from("bring_ups")
-      .select("*", { count: "exact", head: true })
-      .in("file_id", fileIds)
-      .eq("status", "upcoming")
-      .gte("due_date", now.toISOString())
-      .lte("due_date", weekFromNow.toISOString());
-    bringUpsDueThisWeek = count ?? 0;
-  }
 
   return {
     activeClients: activeClients ?? 0,
     openFiles: openFiles ?? 0,
-    bringUpsDueThisWeek,
+    bringUpsDueThisWeek: bringUpsDueThisWeek ?? 0,
   };
 }
