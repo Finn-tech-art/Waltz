@@ -2,8 +2,6 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getBranchStats } from "@/lib/dashboard-stats";
-import { signOut } from "@/app/login/actions";
-import { Button, buttonVariants } from "@/components/ui/button";
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -11,41 +9,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Welcome, {user.name}</h1>
-          <p className="text-sm text-muted-foreground capitalize">Role: {user.role}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {user.role === "admin" && (
-            <Link href="/admin/staff" className={buttonVariants({ variant: "outline" })}>
-              Manage staff accounts
-            </Link>
-          )}
-          <form action={signOut}>
-            <Button type="submit" variant="outline">
-              Sign out
-            </Button>
-          </form>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <Link href="/clients" className={buttonVariants({ variant: "outline" })}>
-          Clients
-        </Link>
-        <Link href="/files" className={buttonVariants({ variant: "outline" })}>
-          Files
-        </Link>
-        <Link href="/bring-ups" className={buttonVariants({ variant: "outline" })}>
-          Bring-ups
-        </Link>
-        <Link href="/calendar" className={buttonVariants({ variant: "outline" })}>
-          Calendar
-        </Link>
-        <Link href="/invoices" className={buttonVariants({ variant: "outline" })}>
-          Invoices
-        </Link>
+      <div>
+        <h1 className="text-2xl font-semibold">Welcome, {user.name}</h1>
+        <p className="text-sm text-muted-foreground capitalize">Role: {user.role}</p>
       </div>
 
       {user.role === "admin" ? (

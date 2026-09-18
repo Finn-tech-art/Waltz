@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getSelectableBranches } from "@/lib/branch-access";
 import { buttonVariants } from "@/components/ui/button";
-import { markBringUpDone } from "@/app/files/actions";
+import { markBringUpDone } from "@/app/(app)/files/actions";
 
 type BringUpRow = {
   id: string;
